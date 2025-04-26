@@ -1,11 +1,19 @@
 import passport from 'passport';
 import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import { Strategy as LocalStrategy } from 'passport-local';
-import userService from '../models/user.model.js';
+import UserModel from '../models/user.model.js';
 import bcrypt from 'bcryptjs';
 
-const JWT_PRIVATE_KEY = "ClaveUltraSecreta";
+const JWT_PRIVATE_KEY = 'KeyPrivateJWT';
 console.log("JWT_PRIVATE_KEY:", JWT_PRIVATE_KEY);
+
+const cookieExtractor = (req) => {
+    let token = null;
+    if (req && req.cookies) {
+        token = req.cookies['jwt'];
+    }
+    return token;
+};
 
 const initializePassport = () => {
 
@@ -14,7 +22,7 @@ const initializePassport = () => {
         async (req, email, password, done) => {
             const { first_name, last_name, age } = req.body;
             try {
-                let user = await userService.findOne({ email: email });
+                let user = await UserModel.findOne({ email: email });
                 if (user) {
                     console.log('User already exists');
                     return done(null, false);
@@ -28,7 +36,7 @@ const initializePassport = () => {
                     password: bcrypt.hashSync(password, bcrypt.genSaltSync(10))
                 };
 
-                const userCreated = await userService.create(newUser);
+                const userCreated = await UserModel.create(newUser);
                 return done(null, userCreated);
             } catch (error) {
                 return done(error);
@@ -40,7 +48,7 @@ const initializePassport = () => {
         { usernameField: 'email' },
         async (email, password, done) => {
             try {
-                const user = await userService.findOne({ email });
+                const user = await UserModel.findOne({ email });
                 if (!user) {
                     console.log('Usuario no encontrado');
                     return done(null, false, { message: "Usuario no encontrado" });
@@ -58,11 +66,11 @@ const initializePassport = () => {
     ));
 
     passport.use('jwt', new JwtStrategy({
-        jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+        jwtFromRequest: cookieExtractor,
         secretOrKey: JWT_PRIVATE_KEY
     }, async (jwt_payload, done) => {
         try {
-            const user = await userService.findById(jwt_payload.id);
+            const user = await UserModel.findById(jwt_payload.id);
 
             if (!user) {
                 return done(null, false, { message: 'User not found' });

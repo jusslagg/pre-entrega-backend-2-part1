@@ -7,9 +7,13 @@
 </head>
 <body>
     <h1>Registro de usuario</h1>
-    <form action="/session/register" method="POST">
-        <label for="name">Nombre:</label><br>
-        <input type="text" id="name" name="name" required><br><br>
+    <form action="/api/sessions/register" method="POST">
+        <label for="first_name">Nombre:</label><br>
+        <input type="text" id="first_name" name="first_name" required><br><br>
+        <label for="last_name">Apellido:</label><br>
+        <input type="text" id="last_name" name="last_name" required><br><br>
+        <label for="age">Edad:</label><br>
+        <input type="number" id="age" name="age" required><br><br>
         <label for="email">Email:</label><br>
         <input type="email" id="email" name="email" required><br><br>
         <label for="password">Contraseña:</label><br>

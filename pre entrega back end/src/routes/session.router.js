@@ -1,24 +1,55 @@
 import { Router } from 'express';
 import passport from 'passport';
-import { generateToken } from '../utils.js'; // Asegúrate de que esta función exista
+import { generateToken } from '../utils.js';
+import UserModel from '../models/user.model.js';
 
 const router = Router();
-const users = []; // Persistimos usuarios en memoria
 
 // Ruta para el registro de usuarios
-router.post('/register', (req, res) => {
-    const { name, email, password } = req.body;
-    const exists = users.find(user => user.email === email);
-    if (exists) 
-        return res.status(406).send({ status: 'error', error: 'User already exists' });
+router.post('/register', async (req, res) => {
+    const { first_name, last_name, email, age, password } = req.body;
 
-    const user = { name, email, password };
-    users.push(user);
+    try {
+        if (!first_name || !last_name || !email || !age || !password) {
+            return res.status(400).send({ status: 'error', error: 'Missing required fields' });
+        }
 
-    // Generamos un token con el usuario y se lo enviamos al usuario
-    const access_token = generateToken(user);
-    res.cookie('jwt', access_token, { httpOnly: true }); // Establecer la cookie
-    res.send({ status: 'success', access_token });
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).send({ status: 'error', error: 'Invalid email format' });
+        }
+
+        const exists = await UserModel.findOne({ email });
+        if (exists) {
+            return res.status(400).send({ status: 'error', error: 'User already exists' });
+        }
+
+        let user;
+        try {
+            user = await UserModel.create({
+                first_name,
+                last_name,
+                email,
+                age,
+                password
+            });
+        } catch (dbError) {
+            console.error("Database error creating user:", dbError);
+            return res.status(500).send({ status: 'error', error: 'Database error creating user' });
+        }
+
+        const access_token = generateToken(user);
+        res.cookie('jwt', access_token, {
+            maxAge: 60 * 60 * 1000,
+            httpOnly: true
+        });
+        res.send({ status: 'success', access_token });
+
+    } catch (error) {
+        console.error("General error registering user:", error);
+        return res.status(500).send({ status: 'error', error: 'Internal server error' });
+    }
 });
 
 // Ruta para obtener el usuario actual con JWT
@@ -27,14 +58,26 @@ router.get('/current', passport.authenticate('jwt', { session: false }), (req, r
 });
 
 // Ruta para el login de usuarios
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
     const { email, password } = req.body;
-    const user = users.find(user => user.email === email && user.password === password);
-    if (!user) return res.status(408).send({ status: 'error', error: 'Invalid credentials' });
-    
-    // Generamos un token con el usuario y se lo enviamos
-    const access_token = generateToken(user);
-    res.send({ status: 'success', access_token });
+
+    try {
+        const user = await UserModel.findOne({ email, password });
+        if (!user) {
+            return res.status(400).send({ status: 'error', error: 'Invalid credentials' });
+        }
+
+        const access_token = generateToken(user);
+        res.cookie('jwt', access_token, {
+            maxAge: 60 * 60 * 1000,
+            httpOnly: true
+        });
+        res.send({ status: 'success', access_token });
+
+    } catch (error) {
+        console.error("Error logging in user:", error);
+        return res.status(500).send({ status: 'error', error: 'Internal server error' });
+    }
 });
 
 export default router;

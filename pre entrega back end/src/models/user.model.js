@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const userCollection = "users";
+const userCollection = "gamesphere";
 
 // Definir el esquema para el usuario
 const userSchema = new mongoose.Schema({
@@ -13,6 +13,11 @@ const userSchema = new mongoose.Schema({
     role: { type: String, default: 'user' }
 });
 
-const UserModel = mongoose.model(userCollection, userSchema);
+let UserModel;
+try {
+    UserModel = mongoose.model(userCollection, userSchema);
+} catch (error) {
+    console.error("Error creating UserModel:", error);
+}
 
 export default UserModel;
