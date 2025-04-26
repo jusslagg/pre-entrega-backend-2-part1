@@ -10,7 +10,7 @@ const PRIVATE_KEY = "ClaveUltraSecreta"; // O utiliza la clave del archivo .env
 
 // Función para generar un token JWT
 export const generateToken = (user) => {
-    const token = jwt.sign(user, PRIVATE_KEY, { expiresIn: '24h' });
+    const token = jwt.sign({ id: user._id }, PRIVATE_KEY, { expiresIn: '24h' });
     return token;
 };
 

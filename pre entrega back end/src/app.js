@@ -1,9 +1,10 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import dotenv from 'dotenv';
 import viewsRouter from './routes/views.router.js';
 import sessionRouter from './routes/session.router.js';
 import initializePassport from './config/passport.config.js'; // Asegúrate de que 'passport.config.js' esté correctamente configurado
-
+dotenv.config();
 const app = express();
 initializePassport();
 
