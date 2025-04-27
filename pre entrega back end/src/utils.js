@@ -1,58 +1,33 @@
-import userService from './models/user.model.js';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import jwt from 'jsonwebtoken';
+import bcrypt from "bcrypt";
+import passport from "passport";
 
-const __filename = fileURLToPath(import.meta.url);
-//const __dirname = dirname(__filename);
+export const generateHash = (password) =>
+  bcrypt.hashSync(password, bcrypt.genSaltSync(10));
 
-const PRIVATE_KEY = "ClaveUltraSecreta"; // O utiliza la clave del archivo .env
+export const isValidPassword = (user, password) =>
+  bcrypt.compareSync(password, user.password);
 
-// Función para generar un token JWT
-export const generateToken = (user) => {
-    const token = jwt.sign({ id: user._id }, PRIVATE_KEY, { expiresIn: '24h' });
-    return token;
+export const passportCall = (strategy) => {
+  return async (req, res, next) => {
+    passport.authenticate(strategy, function (err, user, info) {
+      if (err) return next(err);
+      if (!user) {
+        res
+          .status(401)
+          .send({ error: info.messages ? info.messages : info.toString() });
+        return;
+      }
+      req.user = user;
+      next();
+    })(req, res, next);
+  };
 };
 
-// Middleware de autenticación para verificar el token JWT
-export const authToken = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-        console.log("No token provided");
-        return res.status(401).send({
-            error: "Not authenticated"
-        });
-    }
-
-    const token = authHeader.split(' ')[1]; // Token después de 'Bearer'
-    if (!token) {
-        console.log("Token missing after Bearer");
-        return res.status(401).send({
-            error: "Token missing"
-        });
-    }
-
-    jwt.verify(token, PRIVATE_KEY, (error, credentials) => {
-        if (error) {
-            console.log("Token verification failed:", error);
-            return res.status(403).send({
-                error: "Not authorized"
-            });
-        }
-
-        // Buscamos el usuario en la base de datos
-        userService.findById(credentials.id)
-            .then(user => {
-                req.user = user; // Establecemos el usuario en la solicitud
-                next();
-            })
-            .catch(err => {
-                console.log("Error fetching user:", err);
-                return res.status(500).send({
-                    error: "Failed to fetch user"
-                });
-            });
-    });
+export const authorization = (role) => {
+  return async (req, res, next) => {
+    if (!req.user) return res.status(401).send({ message: "No autorizado" });
+    if (req.user.role != role)
+      return res.status(403).send({ error: "No tienes permiso" });
+    next();
+  };
 };
-
-export const __dirname = dirname(__filename);

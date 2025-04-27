@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-
+import { generateHash } from "../utils.js";
 const userCollection = "gamesphere";
 
 // Definir el esquema para el usuario
@@ -13,11 +13,13 @@ const userSchema = new mongoose.Schema({
     role: { type: String, default: 'user' }
 });
 
-let UserModel;
-try {
-    UserModel = mongoose.model(userCollection, userSchema);
-} catch (error) {
-    console.error("Error creating UserModel:", error);
-}
-
-export default UserModel;
+userSchema.pre("save", function (next) {
+    if (!this.isModified("password")) return next();
+    this.password = generateHash(this.password);
+    next();
+  });
+  
+  const User = mongoose.model(userCollection, userSchema);
+  
+  export default User;
+  

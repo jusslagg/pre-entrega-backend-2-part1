@@ -1,83 +1,68 @@
-import { Router } from 'express';
-import passport from 'passport';
-import { generateToken } from '../utils.js';
-import UserModel from '../models/user.model.js';
+import { Router } from "express";
+import userService from "../models/user.model.js";
+import { isValidPassword } from "../utils.js";
+import jwt from "jsonwebtoken";
+import config from "../config/config.js";
 
 const router = Router();
 
-// Ruta para el registro de usuarios
-router.post('/register', async (req, res) => {
-    const { first_name, last_name, email, age, password } = req.body;
-
-    try {
-        if (!first_name || !last_name || !email || !age || !password) {
-            return res.status(400).send({ status: 'error', error: 'Missing required fields' });
-        }
-
-        // Basic email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).send({ status: 'error', error: 'Invalid email format' });
-        }
-
-        const exists = await UserModel.findOne({ email });
-        if (exists) {
-            return res.status(400).send({ status: 'error', error: 'User already exists' });
-        }
-
-        let user;
-        try {
-            user = await UserModel.create({
-                first_name,
-                last_name,
-                email,
-                age,
-                password
-            });
-        } catch (dbError) {
-            console.error("Database error creating user:", dbError);
-            return res.status(500).send({ status: 'error', error: 'Database error creating user' });
-        }
-
-        const access_token = generateToken(user);
-        res.cookie('jwt', access_token, {
-            maxAge: 60 * 60 * 1000,
-            httpOnly: true
-        });
-        res.send({ status: 'success', access_token });
-
-    } catch (error) {
-        console.error("General error registering user:", error);
-        return res.status(500).send({ status: 'error', error: 'Internal server error' });
-    }
+router.post("/register", async (req, res) => {
+  const { first_name, last_name, email, age, password } = req.body;
+  if (!first_name || !last_name || !email || !age || !password) {
+    res.status(400).json({ message: "Faltan datos" });
+    return;
+  }
+  try {
+    const newUser = new userService({
+      first_name,
+      last_name,
+      email,
+      age,
+      password,
+    });
+    await newUser.save();
+    res.status(201).send({ message: "Usuario registrado exitosamente" });
+  } catch (error) {
+    res.status(400).send({ message: "Error al registrar el usuario" });
+  }
 });
 
-// Ruta para obtener el usuario actual con JWT
-router.get('/current', passport.authenticate('jwt', { session: false }), (req, res) => {
-    res.send({ status: 'success', user: req.user });
-});
-
-// Ruta para el login de usuarios
-router.post('/login', async (req, res) => {
+router.post("/login", async (req, res) => {
+  try {
     const { email, password } = req.body;
-
-    try {
-        const user = await UserModel.findOne({ email, password });
-        if (!user) {
-            return res.status(400).send({ status: 'error', error: 'Invalid credentials' });
-        }
-
-        const access_token = generateToken(user);
-        res.cookie('jwt', access_token, {
-            maxAge: 60 * 60 * 1000,
-            httpOnly: true
-        });
-        res.send({ status: 'success', access_token });
-
-    } catch (error) {
-        console.error("Error logging in user:", error);
-        return res.status(500).send({ status: 'error', error: 'Internal server error' });
+    if (!email || !password) {
+      res.status(400).json({ message: "Faltan datos" });
+      return;
     }
+    const user = await userService.findOne({ email });
+    if (!user) {
+      res.status(401).json({ message: "Datos incorrectos" });
+      return;
+    }
+    if (!isValidPassword(user, password)) {
+      res.status(403).json({ message: "Datos incorrectos" });
+      return;
+    }
+    const token = jwt.sign(
+      { email: user.email, role: user.role },
+      config.jwtPrivateKey,
+      {
+        expiresIn: config.jwtExpiresIn,
+      }
+    );
+    res.cookie("token", token, {
+      httpOnly: true,
+    });
+    res.status(200).json({ message: "Inicio de sesion exitoso" });
+  } catch (error) {
+    res.status(400).send({ message: "Error al iniciar sesion" });
+    console.log(error);
+  }
+});
+
+router.post("/logout", (req, res) => {
+  res.clearCookie("token");
+  res.status(200).json({ message: "Haz cerrado sesión" });
 });
 
 export default router;

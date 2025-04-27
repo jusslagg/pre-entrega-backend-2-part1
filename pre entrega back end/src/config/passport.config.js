@@ -1,87 +1,37 @@
-import passport from 'passport';
-import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
-import { Strategy as LocalStrategy } from 'passport-local';
-import UserModel from '../models/user.model.js';
-import bcrypt from 'bcryptjs';
+import passport from "passport";
+import jwt from "passport-jwt";
+import config from "./config.js";
 
-const JWT_PRIVATE_KEY = 'KeyPrivateJWT';
-console.log("JWT_PRIVATE_KEY:", JWT_PRIVATE_KEY);
+const JWT_PRIVATE_KEY = config.jwtPrivateKey;
+
+const JwtStrategy = jwt.Strategy;
+const ExtractJwt = jwt.ExtractJwt;
 
 const cookieExtractor = (req) => {
-    let token = null;
-    if (req && req.cookies) {
-        token = req.cookies['jwt'];
-    }
-    return token;
+  let token = null;
+  if (req && req.cookies) {
+    token = req.cookies["token"];
+  }
+  return token;
 };
 
 const initializePassport = () => {
-
-    passport.use('register', new LocalStrategy(
-        { passReqToCallback: true, usernameField: 'email' },
-        async (req, email, password, done) => {
-            const { first_name, last_name, age } = req.body;
-            try {
-                let user = await UserModel.findOne({ email: email });
-                if (user) {
-                    console.log('User already exists');
-                    return done(null, false);
-                }
-
-                const newUser = {
-                    first_name,
-                    last_name,
-                    email,
-                    age,
-                    password: bcrypt.hashSync(password, bcrypt.genSaltSync(10))
-                };
-
-                const userCreated = await UserModel.create(newUser);
-                return done(null, userCreated);
-            } catch (error) {
-                return done(error);
-            }
-        }
-    ));
-
-    passport.use('login', new LocalStrategy(
-        { usernameField: 'email' },
-        async (email, password, done) => {
-            try {
-                const user = await UserModel.findOne({ email });
-                if (!user) {
-                    console.log('Usuario no encontrado');
-                    return done(null, false, { message: "Usuario no encontrado" });
-                }
-
-                if (!bcrypt.compareSync(password, user.password)) {
-                    return done(null, false, { message: "Contraseña incorrecta" });
-                }
-
-                return done(null, user);
-            } catch (error) {
-                return done(error);
-            }
-        }
-    ));
-
-    passport.use('jwt', new JwtStrategy({
-        jwtFromRequest: cookieExtractor,
-        secretOrKey: JWT_PRIVATE_KEY
-    }, async (jwt_payload, done) => {
+  passport.use(
+    "jwt",
+    new JwtStrategy(
+      {
+        jwtFromRequest: ExtractJwt.fromExtractors([cookieExtractor]),
+        secretOrKey: JWT_PRIVATE_KEY,
+      },
+      async (jwt_payload, done) => {
         try {
-            const user = await UserModel.findById(jwt_payload.id);
-
-            if (!user) {
-                return done(null, false, { message: 'User not found' });
-            }
-
-            return done(null, user);
+          return done(null, jwt_payload);
         } catch (error) {
-            console.error(error);
-            return done(error, false);
+          done(error);
         }
-    }));
+      }
+    )
+  );
 };
 
 export default initializePassport;
