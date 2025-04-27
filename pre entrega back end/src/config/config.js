@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+console.log("JWT_PRIVATE_KEY in config:", process.env.JWT_PRIVATE_KEY);
 export default {
   port: process.env.PORT,
   mongoUrl: process.env.MONGO_URL,

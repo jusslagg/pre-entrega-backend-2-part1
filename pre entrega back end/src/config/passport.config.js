@@ -1,8 +1,11 @@
+import dotenv from "dotenv";
+dotenv.config();
 import passport from "passport";
 import jwt from "passport-jwt";
 import config from "./config.js";
 
 const JWT_PRIVATE_KEY = config.jwtPrivateKey;
+console.log("JWT_PRIVATE_KEY:", JWT_PRIVATE_KEY);
 
 const JwtStrategy = jwt.Strategy;
 const ExtractJwt = jwt.ExtractJwt;
