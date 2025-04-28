@@ -1,61 +1,80 @@
-import dotenv from "dotenv";
-dotenv.config();
-
+// Importar los módulos necesarios
+import session from "express-session";
+import MongoStore from "connect-mongo";
 import express from "express";
-import config from "./config/config.js";
+import handlebars from "express-handlebars";
+import { __dirname, passportCall } from "./utils.js";
+import viewsRouter from "./routes/views.router.js";
+import sessionRouter from "./routes/session.router.js";
 import mongoose from "mongoose";
-import cookieParser from "cookie-parser";
 import passport from "passport";
 import initializePassport from "./config/passport.config.js";
-import sessionRouter from "./routes/session.router.js";
-import userRouter from "./routes/user.router.js";
-import cors from "cors";
+import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
 
-const PORT = config.port;
-const MONGO_URL = config.mongoUrl;
+dotenv.config();
+// Obtener la URI de conexión de MongoDB desde las variables de entorno
+const mongoURL = process.env.URI_MONGO;
+// Obtener el puerto desde las variables de entorno, o usar 8080 por defecto
+const port = process.env.PORT || 8080;
 
 const app = express();
 
-const allowedOrigins = [
-  `http://localhost:${PORT}`,
-  config.frontendUrl,
-  config.frontendDevUrl,
-];
-
-console.log("Allowed Origins:", allowedOrigins); // Para depuración
-
+// Configuración de la sesión
 app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.error(`CORS bloqueado para origen: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
+  session({
+    store: MongoStore.create({
+      // Usar la URI de conexión de MongoDB desde las variables de entorno
+      mongoUrl: mongoURL,
+      //   mongoOptions: { useNewUrlParser: true, useUnifiedTopology: true },
+      ttl: 600,
+    }),
+    secret: "secretPassword",
+    resave: false,
+    saveUninitialized: false,
   })
 );
 
+//COnfiguración de los middleware para trabajar con json desde formularios
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-initializePassport();
-app.use(passport.initialize());
 
-app.use("/api/session", sessionRouter);
-app.use("/api/user", userRouter);
-
+// Configuración de la conexión a la base de datos
 mongoose
-  .connect(MONGO_URL)
+  .connect(mongoURL)
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`listening on port ${PORT}`);
-      console.log("Connected to MongoDB");
-    });
+    // Imprimir mensaje de éxito cuando se conecta a la base de datos
+    console.log("Conectado a la base de datos");
   })
   .catch((error) => {
-    console.error("Failed to connect to MongoDB:", error);
+    // Imprimir mensaje de error si falla la conexión a la base de datos
+    console.log(error);
   });
+
+// Passport configuration
+initializePassport();
+app.use(passport.initialize());
+app.use(passport.session());
+
+//COnfiguración del motor de plantillas
+app.engine("handlebars", handlebars.engine());
+app.set("views", __dirname + "/views");
+app.set("view engine", "handlebars");
+
+// Configuración de la carpeta pública
+app.use(express.static("public"));
+
+//Rutas
+app.use(cookieParser());
+app.use("/", viewsRouter);
+app.use("/api/sessions", sessionRouter);
+
+const server = app.listen(port, () => {
+  // Imprimir mensaje cuando el servidor está corriendo
+  console.log(`Server running on port ${port}`);
+});
+
+
+//Mensajes para el Jesús del futuro
+// Recuerda agregar tu dirección IP a la lista blanca en MongoDB Atlas para que la aplicación pueda conectarse a la base de datos
+// ¡Importante! Sin esto, la aplicación no podrá conectarse a la base de datos.
